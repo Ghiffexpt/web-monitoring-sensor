@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="id"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Web Monitoring Sensor</title>
+<style>
+:root{--bg:#fff;--fg:#1a1a1a;--card:#f4f4f5;--red:#c8102e;--mut:#666}
+body{font-family:system-ui,sans-serif;background:var(--bg);color:var(--fg);margin:0;padding:16px}
+h1{color:var(--red);font-size:1.3rem;margin:0 0 4px}.sub{color:var(--mut);font-size:.85rem;margin-bottom:16px}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:12px}
+.card{background:var(--card);border-radius:8px;padding:12px}
+.v{font-size:2rem;font-weight:700}.l{color:var(--mut);font-size:.8rem}
+canvas{width:100%;height:160px;display:block}
+</style></head><body>
+<h1>Web Monitoring Sensor</h1>
+<div class="sub">Instrumentasi Elektronika &middot; <span id="st">menunggu data...</span></div>
+<div class="grid">
+<div class="card"><div class="l">Suhu (&deg;C)</div><div class="v" id="vs">-</div><canvas id="cs"></canvas></div>
+<div class="card"><div class="l">Tegangan (V)</div><div class="v" id="vt">-</div><canvas id="ct"></canvas></div>
+</div>
+<script>
+const $ = id => document.getElementById(id);
+function plot(cv, ys, color) {
+  const r = window.devicePixelRatio || 1, w = cv.clientWidth, h = cv.clientHeight;
+  cv.width = w * r; cv.height = h * r;
+  const g = cv.getContext("2d"); g.scale(r, r); g.clearRect(0, 0, w, h);
+  if (ys.length < 2) return;
+  const mn = Math.min(...ys), mx = Math.max(...ys), sp = (mx - mn) || 1;
+  g.strokeStyle = color; g.lineWidth = 2; g.beginPath();
+  ys.forEach((y, i) => {
+    const x = i / (ys.length - 1) * w, yy = h - 6 - (y - mn) / sp * (h - 12);
+    if (i) g.lineTo(x, yy); else g.moveTo(x, yy);
+  });
+  g.stroke();
+  g.fillStyle = "#888"; g.font = "11px sans-serif";
+  g.fillText(mx.toFixed(2), 2, 11); g.fillText(mn.toFixed(2), 2, h - 2);
+}
+async function tick() {
+  try {
+    const d = await (await fetch("/api/data?limit=100")).json();
+    if (d.length) {
+      const a = d[d.length - 1];
+      $("vs").textContent = a.suhu_c.toFixed(1);
+      $("vt").textContent = a.tegangan_v.toFixed(2);
+      plot($("cs"), d.map(x => x.suhu_c), "#c8102e");
+      plot($("ct"), d.map(x => x.tegangan_v), "#1f5fbf");
+      $("st").textContent = "terakhir: " + new Date(a.ts * 1000).toLocaleTimeString();
+    }
+  } catch (e) { $("st").textContent = "server tidak terjangkau"; }
+}
+tick(); setInterval(tick, 2000);
+</script></body></html>
